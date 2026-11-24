@@ -1,10 +1,14 @@
+#include <raylib.h>
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
+#include <errno.h>
 
-const int size_x = 200;
-const int size_y = 100;
-
+const int BLOCK_SIZE = 6;
+const int WINDOW_X = 1800;
+const int WINDOW_Y =1200;
+const int SIZE_X = 2000;
+const int SIZE_Y = 2000;
 
 const char *dead_output = "\u25A1";
 const char *alive_output = "\u25A0";
@@ -14,24 +18,24 @@ enum cell_status {
     ALIVE
 };
 
-int field[size_x][size_y];
-int next_field[size_x][size_y];
+int field[SIZE_X][SIZE_Y];
+int next_field[SIZE_X][SIZE_Y];
 int generation = 0;
 
 void initField() {
     //set random seed
     srand(time(NULL));
     //init field with random values
-    for (int x = 0; x<size_x; x++) {
-        for (int y = 0; y<size_y; y++) {
-            field[x][y] = (rand() % 4 == 0);
+    for (int x = 0; x<SIZE_X; x++) {
+        for (int y = 0; y<SIZE_Y; y++) {
+            field[x][y] = (rand() % 12 == 0);
         }
     }
 }
 
 void print_field() {
-    for (int y = 0; y<size_y; y++) {
-        for (int x = 0; x<size_x; x++){
+    for (int y = 0; y<SIZE_Y; y++) {
+        for (int x = 0; x<SIZE_X; x++){
             if (field[x][y] == DEAD) printf("%s", dead_output);
             else printf("%s", alive_output);
         }
@@ -40,20 +44,20 @@ void print_field() {
 }
 
 void print_next_field() {
-    for (int i = 0; i < size_x; i++) {
+    for (int i = 0; i < SIZE_X; i++) {
         printf("-");
     }
     printf("\n");
     printf("Generation: %d", generation);
     printf("\n");
-    for (int y = 0; y<size_y; y++) {
-        for (int x = 0; x<size_x; x++){
+    for (int y = 0; y<SIZE_Y; y++) {
+        for (int x = 0; x<SIZE_X; x++){
             if (next_field[x][y] == DEAD) printf("%s", dead_output);
             else printf("%s", alive_output);
         }
         printf("\n");
     }
-    for (int i = 0; i < size_x; i++) {
+    for (int i = 0; i < SIZE_X; i++) {
         printf("-");
     }
     printf("\n");
@@ -65,7 +69,7 @@ int count_neighbours(int x, int y) {
     int count = 0;
     for (int i = 0; i < 8; i++) {
         //check if index is in array
-        if (neighbour_cells[i][0] >= 0 && neighbour_cells[i][0] < size_x && neighbour_cells[i][1] >= 0 && neighbour_cells[i][1] < size_y) {
+        if (neighbour_cells[i][0] >= 0 && neighbour_cells[i][0] < SIZE_X && neighbour_cells[i][1] >= 0 && neighbour_cells[i][1] < SIZE_Y) {
             //add field status (0 if dead, 1 if alive)
             count += field[neighbour_cells[i][0]][neighbour_cells[i][1]];
         }
@@ -75,8 +79,8 @@ int count_neighbours(int x, int y) {
 
 void copy_field() {
     //copy new field into old one
-    for (int y = 0; y<size_y; y++) {
-        for (int x = 0; x < size_x; x++){
+    for (int y = 0; y<SIZE_Y; y++) {
+        for (int x = 0; x < SIZE_X; x++){
             field[x][y] = next_field[x][y];
         }
     }
@@ -86,8 +90,8 @@ void calc_new_generation() {
     //generation count
     generation++;
     //calc cell status
-    for (int y = 0; y<size_y; y++) {
-        for (int x = 0; x < size_x; x++){
+    for (int y = 0; y<SIZE_Y; y++) {
+        for (int x = 0; x < SIZE_X; x++){
             int neighbours = count_neighbours(x,y);
             if (field[x][y] == ALIVE && (neighbours < 2 || neighbours > 3)) {
                 next_field[x][y] = DEAD;
@@ -102,18 +106,62 @@ void calc_new_generation() {
     }
     //copy new field on old field
     copy_field();
-    //print new field
-    print_field();
+}
+
+void drawField() {
+    ClearBackground(RAYWHITE);
+    const int startX = 10, startY = 50;
+    const int w = SIZE_X * BLOCK_SIZE, h = SIZE_Y * BLOCK_SIZE;
+
+    DrawRectangle(startX, startY, w, h, WHITE);
+
+    for (int y = 0; y < SIZE_Y; y++)
+        for (int x = 0; x < SIZE_X; x++)
+            if (field[y][x])
+                DrawRectangle(startX + x*BLOCK_SIZE, startY + y*BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, BLACK);
+
+    for (int x = 0; x <= SIZE_X; x++)
+        DrawLine(startX + x*BLOCK_SIZE, startY, startX + x*BLOCK_SIZE, startY + h, LIGHTGRAY);
+    for (int y = 0; y <= SIZE_Y; y++)
+        DrawLine(startX, startY + y*BLOCK_SIZE, startX + w, startY + y*BLOCK_SIZE, LIGHTGRAY);
+}
+
+void drawStats() {
+    DrawText(TextFormat("Generation: %d", generation), 10, 10, 25, BLACK);
+}
+
+int msleep(long msec)
+{
+    struct timespec ts;
+    int res;
+
+    if (msec < 0)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    ts.tv_sec = msec / 1000;
+    ts.tv_nsec = (msec % 1000) * 1000000;
+
+    do {
+        res = nanosleep(&ts, &ts);
+    } while (res && errno == EINTR);
+
+    return res;
 }
 
 int main(void) {
     initField();
-    print_field();
-    while (1) {
-        printf("\n");
+    InitWindow(WINDOW_X, WINDOW_Y, "Conway's Game of Life");
+    while(!WindowShouldClose()) {
+        BeginDrawing();
         calc_new_generation();
-        print_next_field();
-        getchar();
+        drawField();
+        drawStats();
+        EndDrawing();
+        //msleep(100);
     }
+    CloseWindow();
     return 0;
 }
