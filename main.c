@@ -1,17 +1,26 @@
 #include <raylib.h>
+#define RAYGUI_IMPLEMENTATION
+#include "raygui.h"
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
 #include <errno.h>
 
-const int BLOCK_SIZE = 6;
+int BLOCK_SIZE = 3;
 const int WINDOW_X = 1800;
-const int WINDOW_Y =1200;
+const int WINDOW_Y =900;
 const int SIZE_X = 2000;
 const int SIZE_Y = 2000;
 
 const char *dead_output = "\u25A1";
 const char *alive_output = "\u25A0";
+
+clock_t current, last;
+float speed = 250;
+float max_delay = 600;
+float min_delay = 0;
+
+int autoCalc = 1;
 
 enum cell_status {
     DEAD,
@@ -28,7 +37,7 @@ void initField() {
     //init field with random values
     for (int x = 0; x<SIZE_X; x++) {
         for (int y = 0; y<SIZE_Y; y++) {
-            field[x][y] = (rand() % 12 == 0);
+            field[x][y] = (rand() % 14 == 0);
         }
     }
 }
@@ -151,16 +160,63 @@ int msleep(long msec)
     return res;
 }
 
-int main(void) {
-    initField();
-    InitWindow(WINDOW_X, WINDOW_Y, "Conway's Game of Life");
-    while(!WindowShouldClose()) {
-        BeginDrawing();
+void toggleAutoCalc() {
+    autoCalc = (++autoCalc) %2;
+}
+
+void plus_size(int val) {
+    BLOCK_SIZE = BLOCK_SIZE + val;
+    if (BLOCK_SIZE > 30) {
+        BLOCK_SIZE = 30;
+    }
+}
+void minus_size(int val) {
+    BLOCK_SIZE = BLOCK_SIZE - val;
+    if (BLOCK_SIZE < 2) {
+        BLOCK_SIZE = 2;
+    }
+}
+
+void drawButtons() {
+    if (GuiButton((Rectangle){300, 10, 90, 30}, "Auto")) {
+        toggleAutoCalc();
+    }
+    if (GuiButton((Rectangle){400, 10, 90, 30}, "Step")) {
         calc_new_generation();
         drawField();
+    }
+    if (GuiButton((Rectangle){500, 10, 40, 30}, "Size +")) {
+        plus_size(2);
+    }
+    if (GuiButton((Rectangle){550, 10, 40, 30}, "Size -")) {
+        minus_size(2);
+    }
+    if (GuiButton((Rectangle){600, 10, 90, 30}, "Reactivate")) {
+        generation = 0;
+        initField();
+    }
+    GuiSliderBar((Rectangle){800, 10, 90, 30}, "Speed -", "Speed +", &speed, min_delay, max_delay);
+}
+
+int main(void) {
+    initField();
+    last = clock();
+    InitWindow(WINDOW_X, WINDOW_Y, "Conway's Game of Life");
+    SetWindowMinSize(WINDOW_X, WINDOW_Y);
+    while(!WindowShouldClose()) {
+        BeginDrawing();
+        drawButtons();
+        current = clock();
+        if (autoCalc == 1) {
+            double time_elapsed = ((double)(current-last) / CLOCKS_PER_SEC) * 1000.0;
+            if (time_elapsed > (max_delay-speed)) {
+                calc_new_generation();
+                 last = clock();
+            }
+        }
         drawStats();
+        drawField();
         EndDrawing();
-        //msleep(100);
     }
     CloseWindow();
     return 0;
